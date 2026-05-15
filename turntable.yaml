@@ -1,0 +1,68 @@
+substitutions:
+  # PROJECT 
+  friendly_name:  Turntable
+  device_name:    turntable
+  comment:        "Turntable Control Panel"
+
+  # I/O EXPANDER
+    # → MAPS A0(=0)→A7(=6) to B0(=7)→B7(=15)
+  MCP_SDA:    GPIO23
+  MCP_SCL:    GPIO39
+  # DISPLAY 
+  MOSI:       GPIO22
+  LCD_CLK:    GPIO13
+  LCD_CS:     GPIO12
+  LCD_DC:     GPIO11
+  LCD_RST:    GPIO10
+  LCD_BL:     GPIO9
+  # TOUCH
+  TP_SDA:     GPIO8
+  TP_SCL:     GPIO27
+  TP_RST:     GPIO26
+    # TP_IRQ: GPIO41    
+    # → use only in combination with WIFI otherwise touch interrupt conflicts        
+    # → use polling instead when running ethernet only   
+  # Button (Kailh Choc)
+  BTN_CHOC_NO: 2                # use pin A2 on I/O EXPANDER
+  # Rotary Encoder + SW
+  RE_CLK:     GPIO41
+  RE_DT:      GPIO42
+  RE_SW:      1                 # use pin A1 on I/O EXPANDER
+  # Stepper Motor
+  SM_EN:      GPIO19            #GREEN
+  SM_STEP:    GPIO20            #BLUE
+  SM_DIR:     GPIO21            #YELLOW
+
+globals:
+  # Kalih Button → State
+  - id: btn_choc_state
+    type: bool
+    initial_value: 'false'
+    #restore_value: yes          # saves the state to flash memory
+  # Rotary Encoder → State
+  - id: btn_re_state
+    type: bool
+    initial_value: 'false'
+  # Motor Control
+  - id: motor_running
+    type: bool
+    initial_value: 'false'
+  - id: motor_direction
+    type: int
+    initial_value: '1'      # 1 = CW, -1 = CCW
+  - id: current_speed
+    type: int
+    initial_value: '1000'
+
+### ==========================================================
+### ▼ PACKAGES ▼
+### ==========================================================
+
+packages:
+  board:        !include boards/m5stack-p4-poe.yaml
+  esphome:      !include projects/turntable/esphome.yaml
+  touchdisplay: !include projects/turntable/touchdisplay.yaml
+  hardware:     !include projects/turntable/hardware.yaml
+  stepper:      !include projects/turntable/stepper.yaml
+  components:   !include projects/turntable/components.yaml
+  ui:           !include projects/turntable/ui.yaml
