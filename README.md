@@ -3,6 +3,8 @@ Turntable module driven by a stepper motor.
 
 <img width="766" height="587" alt="grok-image-4710213c-62ef-4659-b4ed-fe7faa3dbbd9" src="https://github.com/user-attachments/assets/ab09f9a1-6302-4a81-a864-8857b84047a7" />
 
+[→ see the full project also on MAKERWORLD.](https://makerworld.com/en/models/2802793)
+
 The top plates are interchangeable. I supply two variants 120/240mm.
 .STEP file for custom top plate creation available!
 
