@@ -1,6 +1,8 @@
 # Turntable
 Turntable module driven by a stepper motor.
 
+<img width="766" height="587" alt="grok-image-4710213c-62ef-4659-b4ed-fe7faa3dbbd9" src="https://github.com/user-attachments/assets/ab09f9a1-6302-4a81-a864-8857b84047a7" />
+
 The top plates are interchangeable. I supply two variants 120/240mm.
 .STEP file for custom top plate creation available!
 
@@ -24,3 +26,4 @@ Hardware:
 * Cables, Wires
 
 Wiring:
+<img width="1422" height="888" alt="Screenshot 2026-05-15 at 07 35 56" src="https://github.com/user-attachments/assets/7611c83f-6d5c-48d0-b741-e4691f866821" />
