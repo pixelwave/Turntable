@@ -1,0 +1,231 @@
+### ▼ LVGL GUI ▼ 
+### =============================================
+
+esphome:
+  on_boot:
+      priority: 650          # must run AFTER LVGL is initialized
+      then:
+        # Force backlight on (makes sure it’s visible even after power cycle)
+        - light.turn_on:
+            id: back_light
+            brightness: 100%
+        # Show the first page so LVGL actually draws something
+        - lvgl.page.show:
+            id: canvas_4
+        # raise FPS cap: (refr_timer, X)
+          ## 10 → ~100 FPS
+          ## 16 → ~62 FPS
+          ## 33 → ~30 FPS (original default)
+        - lambda: |-
+            lv_disp_t *disp = lv_disp_get_default();
+            if (disp != NULL) {
+              lv_timer_t *refr_timer = _lv_disp_get_refr_timer(disp);
+              if (refr_timer != NULL) {
+                lv_timer_set_period(refr_timer, 16);
+                //ESP_LOGI("lvgl", "✅ LVGL refresh period forced to 16 ms");
+              } else {
+                ESP_LOGE("lvgl", "❌ Could not get refr_timer");
+              }
+            }
+        - lvgl.label.update:
+            id: lv_label_steps
+            text: !lambda |-
+              return str_sprintf("%d", id(current_speed));
+        - lvgl.button.update:
+            id: lv_button_dir
+            state:
+              checked: true
+        - lvgl.bar.update:
+            id: lv_bar_steps
+            value: !lambda 'return int(id(current_speed) / 15.0);'
+
+# ──────────────────────────────────────
+# FONTS FOR LVGL
+# ──────────────────────────────────────
+font:
+  - file: "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Bold.ttf"
+    id: montserrat_80_bold
+    size: 80
+    bpp: 4
+  - file: "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Bold.ttf"
+    id: montserrat_40_bold
+    size: 40
+    bpp: 4
+  - file: "https://raw.githubusercontent.com/JulietaUla/Montserrat/master/fonts/ttf/Montserrat-Bold.ttf"
+    id: montserrat_20_bold
+    size: 20
+    bpp: 4
+
+# ──────────────────────────────────────
+# IMAGES FOR LVGL
+# ──────────────────────────────────────
+image:
+  # PLAY/PAUSE Button
+  - id: img_play
+    file: projects/turntable/assets/PLAY.png
+    type: RGB565
+  - id: img_pause
+    file: projects/turntable/assets/PAUSE.png
+    type: RGB565
+  # CW/CCW Button
+  - id: img_cw
+    file: projects/turntable/assets/CW.png
+    type: RGB565
+  - id: img_ccw
+    file: projects/turntable/assets/CCW.png
+    type: RGB565
+
+lvgl:
+  # Display & Touch
+  displays:
+    - display1
+  touchscreens:
+    - my_touch      # LVGL will auto-rotate touch
+  rotation: 90
+  buffer_size: 12%
+    # → 75% for large UI but slower
+    # → 12–25% uses fast internal RAM instead of PSRAM! 
+
+  # helps see LVGL debug output
+  #log_level: DEBUG   
+
+  # Replaced the deprecated disp_bg_color
+  bottom_layer:
+    bg_color: 0x000000
+    bg_opa: COVER
+
+  # # global themes
+  # theme:
+  #   button:
+  #     #bg_color: 0x333333 # default (released) color
+  #     #bg_opa: COVER
+  #     #border_width: 2
+  #     #border_color: 0x003366
+  #     #text_color: 0xFFFFFF
+  #     #text_font: montserrat_20
+  #     radius: 5
+  #     shadow_width: 0
+  #     pressed:
+  #       bg_color: 0x999999 # white while pressed
+  #       #text_color: 0x000000 # black text for better contrast on white
+  #       #border_color: 0xAAAAAA
+
+  pages:
+    - id: canvas_4
+      bg_color: 0x000000
+      pad_all: 0
+      widgets:
+
+        # Dynamic Steps Label
+        - label:
+            id: lv_label_steps
+            x: 55
+            y: 69
+            width: 209
+            height: 98
+            text: "1000"
+            text_color: 0xFFFFFF
+            text_align: RIGHT
+            text_font: montserrat_80_bold
+
+        # Dynamic Steps Bar
+        - bar:
+            id: lv_bar_steps
+            x: 56
+            y: 168
+            width: 208
+            height: 18
+            value: 50
+            min_value: 0
+            max_value: 100
+            indicator:
+              bg_color: 0xFFFFFF
+            bg_color: 0x333333
+            border_width: 3
+            border_color: 0x000000
+            radius: 9999
+            outline_width: 3
+
+        # Fixed Steps Label
+        - label:
+            id: lv_label_steps_fixed
+            x: 159
+            y: 201
+            width: 105
+            height: 35
+            text: "STEP/S\n"
+            text_color: 0xFFFFFF
+            text_align: RIGHT
+            text_font: montserrat_20_bold
+
+        # Direction Button
+        - button:
+            id: lv_button_dir
+            x: 320
+            y: 193
+            width: 150
+            height: 117
+            shadow_width: 0
+            checkable: true
+            widgets:
+              - image:
+                  id: lv_dir_image
+                  src: img_cw          # initial
+                  align: CENTER
+            on_value:
+              then:
+                - globals.set:
+                    id: motor_direction
+                    value: !lambda 'return x ? 1 : -1;'
+                - lvgl.image.update:
+                    id: lv_dir_image
+                    src: !lambda 'return x ? id(img_cw) : id(img_ccw);'
+                - if:
+                    condition:
+                      lambda: 'return id(motor_running);'
+                    then:
+                      - stepper.set_target:
+                          id: my_stepper
+                          target: !lambda |-
+                            int dir = id(motor_direction);
+                            return id(my_stepper).current_position + (dir * 10000000);
+
+        # PLAY/PAUSE button
+        - button:
+            id: lv_button_play
+            x: 320
+            y: 10
+            width: 150
+            height: 178
+            shadow_width: 0
+            checkable: true
+            widgets:
+              - image:
+                  id: lv_playpause_image
+                  src: img_play            # initial
+                  align: CENTER
+            on_value:
+              then:
+                - lvgl.image.update:
+                    id: lv_playpause_image
+                    src: !lambda 'return x ? id(img_pause) : id(img_play);'
+                - if:
+                    condition:
+                      lambda: 'return x;'   # PLAY
+                    then:
+                      - globals.set:
+                          id: motor_running
+                          value: !lambda 'return true;'
+                      - stepper.set_target:
+                          id: my_stepper
+                          target: !lambda |-
+                            int dir = id(motor_direction);
+                            return id(my_stepper).current_position + (dir * 10000000);
+                    else:   # PAUSE
+                      - globals.set:
+                          id: motor_running
+                          value: !lambda 'return false;'
+                      - stepper.set_target:
+                          id: my_stepper
+                          target: !lambda |-
+                            return id(my_stepper).current_position;

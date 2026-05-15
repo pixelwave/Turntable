@@ -1,0 +1,4 @@
+switch:
+  # Restart Switch
+  - platform: restart
+    name: "Restart Device"

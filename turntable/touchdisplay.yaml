@@ -1,0 +1,81 @@
+### ▼ WAVESHARE 3.5" Touchscreen ▼ 
+### =============================================
+
+# esphome:
+#   platformio_options:
+#     build_flags:
+#       # SHOW PERFORMANCE OVERLAY
+#       - -ULV_USE_OBSERVER
+#       - -DLV_USE_OBSERVER=1
+#       - -DLV_USE_SYSMON=1
+#       - -DLV_USE_PERF_MONITOR=1
+
+# external_components:
+#   # SHOW PERFORMANCE OVERLAY
+#   - source: github://pr#16362
+#     components: [lvgl]
+#     refresh: 1h
+
+spi:
+  # DISPLAY
+  - id: display_spi
+    clk_pin: ${LCD_CLK}
+    mosi_pin: ${MOSI}
+    interface: spi3
+
+# DISPLAY
+display:
+  - platform: mipi_spi
+    model: ST7796
+    id: display1
+    spi_id: display_spi
+    cs_pin: ${LCD_CS}
+    dc_pin: ${LCD_DC}
+    reset_pin: ${LCD_RST}
+    invert_colors: true
+    color_order: bgr
+    data_rate: 80MHz              
+    #data_rate: 40MHz              #for shorter cable runs
+    auto_clear_enabled: false
+    update_interval: never
+    dimensions:
+      width: 320
+      height: 480
+
+i2c:
+  # TOUCH BUS (FT6336U)
+  - id: touch_i2c
+    sda: ${TP_SDA}      # GPIO17
+    scl: ${TP_SCL}      # GPIO18
+
+# TOUCHSCREEN (FT6336U on Waveshare 3.5")
+touchscreen:
+  - platform: ft63x6
+    id: my_touch
+    i2c_id: touch_i2c
+    update_interval: 20ms        # default polling 50ms, change to 20ms for ultra-snappy UI
+    reset_pin: ${TP_RST}
+    # on_touch:
+    #   then:
+    #     # calibrate touch
+    #     - lambda: |-
+    #           ESP_LOGI("cal", "x=%d, y=%d, x_raw=%d, y_raw=%0d",
+    #               touch.x,
+    #               touch.y,
+    #               touch.x_raw,
+    #               touch.y_raw
+    #               );
+
+output:
+  # DISPLAY → backlight config
+  - platform: ledc
+    pin: ${LCD_BL}
+    id: backlight_pwm
+
+light:
+  # DISPLAY → backlight accessible via HA
+  - platform: monochromatic
+    output: backlight_pwm
+    name: "Display Backlight"
+    id: back_light
+    restore_mode: ALWAYS_ON

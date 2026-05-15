@@ -1,0 +1,26 @@
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: ${comment}
+
+# Enable logging
+logger:
+  # comment out to show all debug messages
+  level: DEBUG
+  logs:
+    sensor: WARN # hides debug from ALL sensors
+  # → SPECIFICALLY ENABLE DEBUG ON COMPONENT LEVEL, add this code to component
+  # on_value:
+  #   - logger.log:
+  #       format: "Component Name >> %.0f %%"
+  #       level: DEBUG
+  #       args: [x]
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "..."
+
+ota:
+  - platform: esphome
+    password: "..."

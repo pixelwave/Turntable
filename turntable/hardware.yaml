@@ -1,0 +1,197 @@
+### ============================
+### ▼ HARDWARE ▼
+### ============================
+
+i2c:
+  # I/O EXPANDER (MCP23017)
+  - id: mcp_i2c
+    sda: ${MCP_SDA}
+    scl: ${MCP_SCL}
+    #frequency: 400kHz   # fast with MCP23017
+    frequency: 100kHz   # longer cable runs
+
+mcp23017:
+  # I/O EXPANDER (MCP23017)
+  - id: mcp23017_hub
+    address: 0x27
+    i2c_id: mcp_i2c
+
+binary_sensor:
+  # BTN (SW) → Kailh Choc
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: ${BTN_CHOC_NO}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Button (Choc)"
+    id: btn_02
+    filters:
+      - delayed_on_off: 50ms
+    on_press:
+      then:
+        - lambda: |-
+            id(motor_direction) = (id(motor_direction) == 1) ? -1 : 1;
+        - lvgl.widget.update:
+            id: lv_button_dir
+            state:
+              checked: !lambda 'return id(motor_direction) == 1;'
+        - if:
+            condition:
+              lambda: 'return id(motor_running);'
+            then:
+              - stepper.set_target:
+                  id: my_stepper
+                  target: !lambda |-
+                    int dir = id(motor_direction);
+                    return id(my_stepper).current_position + (dir * 10000000);
+
+    # on_press:
+    #   - lambda: |-
+    #       id(btn_choc_state) = !id(btn_choc_state);
+    #       lv_color_t new_color = id(btn_choc_state) 
+    #         ? lv_color_hex(0xFFCC00)   // ON
+    #         : lv_color_hex(0x333333);  // OFF
+    #       lv_obj_set_style_bg_color(id(lv_obj_choc), new_color, LV_PART_MAIN);
+    #       lv_obj_invalidate(id(lv_obj_choc));
+    #   - lvgl.page.next:
+    #       animation: FADE_IN
+    #       time: 150ms
+      # Toggle DISPLAY / LVGL
+      # - if:
+      #     condition:
+      #       lambda: 'return id(btn_choc_state);'
+      #     then:
+      #       - light.turn_on: back_light
+      #       - lvgl.resume
+      #       - lvgl.widget.redraw            # forces instant GUI refresh
+      #     else:
+      #       - light.turn_off: back_light
+      #       - lvgl.pause
+  # BTN (SW) → ROTARY ENCODER (ELEGOO KY-040)
+  - platform: gpio
+    pin:
+      mcp23xxx: mcp23017_hub
+      number: ${RE_SW}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "Encoder Push Button"
+    on_press:
+      then:
+        - globals.set:
+            id: motor_running
+            value: !lambda 'return !id(motor_running);'
+        - lvgl.widget.update:
+            id: lv_button_play
+            state:
+              checked: !lambda 'return id(motor_running);'
+        - lvgl.image.update:
+            id: lv_playpause_image
+            src: !lambda 'return id(motor_running) ? id(img_pause) : id(img_play);'
+        - if:
+            condition:
+              lambda: 'return id(motor_running);'
+            then:
+              - stepper.set_target:
+                  id: my_stepper
+                  target: !lambda |-
+                    int dir = id(motor_direction);
+                    return id(my_stepper).current_position + (dir * 10000000);
+            else:
+              - stepper.set_target:
+                  id: my_stepper
+                  target: !lambda |-
+                    return id(my_stepper).current_position;
+
+    # on_press:
+    #   then:
+    #     #- logger.log: "Encoder button pressed — add your custom bench action here!"
+    #     - lambda: |-
+    #         id(btn_re_state) = !id(btn_re_state);
+    #         lv_color_t new_color = id(btn_re_state) 
+    #           ? lv_color_hex(0xFFCC00)   // ON
+    #           : lv_color_hex(0x555555);  // OFF
+    #         //lv_obj_set_style_bg_color(id(lv_bar_re), new_color, LV_PART_MAIN);
+    #         lv_obj_set_style_bg_color(id(lv_bar_re), new_color, LV_PART_INDICATOR);
+    #         lv_obj_invalidate(id(lv_bar_re));
+
+
+sensor:
+  # ROTARY ENCODER → controls speed (max 1500, fine steps around 50)
+  - platform: rotary_encoder
+    name: "Bench Rotary Encoder"
+    id: bench_encoder
+    pin_a: ${RE_DT}
+    pin_b: ${RE_CLK}
+    min_value: -100000
+    max_value: 100000
+    # actions when turning clockwise
+    on_clockwise:
+      then:
+        - lambda: |-
+            int new_speed = id(current_speed);
+            if (new_speed <= 50) {
+              new_speed += 10;
+              if (new_speed > 50) new_speed = 100;   // from 50 jump directly to 100
+            } else {
+              new_speed += 100;
+            }
+            if (new_speed > 1500) new_speed = 1500;
+            id(current_speed) = new_speed;
+            ESP_LOGI("encoder", "🔄 CW → Speed now %d steps/s", new_speed);
+        - stepper.set_speed:
+            id: my_stepper
+            speed: !lambda 'return id(current_speed);'
+        - if:
+            condition:
+              lambda: 'return id(motor_running);'
+            then:
+              - stepper.set_target:
+                  id: my_stepper
+                  target: !lambda |-
+                    int dir = id(motor_direction);
+                    return id(my_stepper).current_position + (dir * 10000000);
+        - lvgl.label.update:
+            id: lv_label_steps
+            text: !lambda |-
+              return str_sprintf("%d", id(current_speed));
+        - lvgl.bar.update:
+            id: lv_bar_steps
+            value: !lambda 'return int(id(current_speed) / 15.0);'
+    # actions when turning counterclockwise
+    on_anticlockwise:
+      then:
+        - lambda: |-
+            int new_speed = id(current_speed);
+            if (new_speed > 50) {
+              new_speed -= 100;
+              if (new_speed < 50) new_speed = 50;
+            } else {
+              new_speed -= 10;
+            }
+            if (new_speed < 10) new_speed = 10;
+            id(current_speed) = new_speed;
+            ESP_LOGI("encoder", "🔄 CCW → Speed now %d steps/s", new_speed);
+        - stepper.set_speed:
+            id: my_stepper
+            speed: !lambda 'return id(current_speed);'
+        - if:
+            condition:
+              lambda: 'return id(motor_running);'
+            then:
+              - stepper.set_target:
+                  id: my_stepper
+                  target: !lambda |-
+                    int dir = id(motor_direction);
+                    return id(my_stepper).current_position + (dir * 10000000);
+        - lvgl.label.update:
+            id: lv_label_steps
+            text: !lambda |-
+              return str_sprintf("%d", id(current_speed));
+        - lvgl.bar.update:
+            id: lv_bar_steps
+            value: !lambda 'return int(id(current_speed) / 15.0);'

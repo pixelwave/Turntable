@@ -1,0 +1,128 @@
+### ============================
+### ▼ STEPPER MOTOR ▼
+### ============================
+
+esphome:
+  on_boot:
+      priority: 600
+      then:
+        - stepper.set_speed:
+            id: my_stepper
+            speed: 1000 steps/s      # ← CHANGE THIS TO YOUR DESIRED DEFAULT
+        - logger.log:
+            format: "🚀 Boot complete – stepper default speed set to %d steps/s"
+            args: ['1000']
+
+stepper:
+  - platform: a4988
+    id: my_stepper
+    step_pin: ${SM_STEP}
+    dir_pin: ${SM_DIR}
+    sleep_pin:
+      number: ${SM_EN}
+      inverted: true
+    max_speed: 10000 steps/s
+    acceleration: 1500 steps/s^2      # ← much more responsive now
+    deceleration: 1500 steps/s^2
+
+# ──────────────────────────────────────
+# Stepper Control for Home Assistant
+# ──────────────────────────────────────
+select:
+  - platform: template
+    name: "Stepper Max Speed SEL"
+    id: stepper_speed_select
+    options:
+      - "50"
+      - "100"
+      - "250"
+      - "500"
+      - "1000"
+    initial_option: "100"
+    set_action:
+      - stepper.set_speed:
+          id: my_stepper
+          speed: !lambda |-
+            auto val = parse_number<int>(x);
+            return val.has_value() ? val.value() : 1000;
+
+number:
+  - platform: template
+    name: "Stepper Target Position"
+    id: stepper_target
+    min_value: -100000
+    max_value: 100000
+    step: 1
+    unit_of_measurement: "steps"
+    mode: slider
+    set_action:
+      - stepper.set_target:
+          id: my_stepper
+          target: !lambda 'return x;'
+
+  - platform: template
+    name: "Stepper Max Speed"
+    id: stepper_speed
+    min_value: 500
+    max_value: 10000
+    step: 500
+    unit_of_measurement: "steps/s"
+    initial_value: 1000
+    set_action:
+      - stepper.set_speed:
+          id: my_stepper
+          speed: !lambda 'return x;'
+
+button:
+  - platform: template
+    name: "Set Home (Set 0)"
+    on_press:
+      - stepper.report_position:
+          id: my_stepper
+          position: 0
+      # It's best to call set_target directly after report_position, so that the stepper doesn't move
+      - stepper.set_target:
+          id: my_stepper
+          target: 0
+
+  - platform: template
+    name: "Return Home"
+    on_press:
+      - stepper.set_target:
+          id: my_stepper
+          target: 0
+
+  - platform: template
+    name: "Full turn ↻ (+3200 steps)"    # 1/16 microsteps full turn = 3200 steps
+    on_press:
+      - stepper.set_target:
+          id: my_stepper
+          target: !lambda 'return id(my_stepper).current_position + 3200;'
+
+  - platform: template
+    name: "Full turn ↺ (-3200 steps)"    # 1/16 microsteps full turn = 3200 steps
+    on_press:
+      - stepper.set_target:
+          id: my_stepper
+          target: !lambda 'return id(my_stepper).current_position - 3200;'
+
+  - platform: template
+    name: "CW ↻"           # 1/16 microsteps full turn = 3200 steps
+    on_press:
+      - stepper.set_target:
+          id: my_stepper
+          target: !lambda 'return id(my_stepper).current_position + 1;'
+
+  - platform: template
+    name: "CCW ↺"    # 1/16 microsteps full turn = 3200 steps
+    on_press:
+      - stepper.set_target:
+          id: my_stepper
+          target: !lambda 'return id(my_stepper).current_position - 1;'
+
+sensor:
+  - platform: template
+    name: "Stepper Current Position"
+    lambda: |-
+      return id(my_stepper).current_position;
+    update_interval: 1s
